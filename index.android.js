@@ -13,10 +13,10 @@ import {
   TextInput,
   SectionList,
   Button,
-  Picker,
-  DatePickerAndroid
+  Picker
 } from 'react-native';
 import Prompt from 'react-native-prompt';
+import DatePicker from 'react-native-datepicker';
 
 export default class PaymentChecker extends Component {
   constructor(props) {
@@ -59,21 +59,29 @@ export default class PaymentChecker extends Component {
   }
 
   pickCard = (value, index) => {
-    // Check if creating new choices
+    // Check if creating new card / removing a card
     if(value == 'Add New Card...'){
       this.setState({promptVisible: true, picking: 'Create New Card'});
+    } else if(value == 'Remove Card...'){
+      this.setState({promptVisible: true, picking: 'Remove Card'});
     } else {
       this.setState({card: value, cardNum: index});
     }
   }
 
   pickChoice = (value, index) => {
-    // Check if creatng new choices
+    // Check if creatng new choices / removing a choice
     if(value == 'Add New Choice...'){
       this.setState({promptVisible: true, picking: 'Create New Choice'});
+    } else if(value == 'Remove Choice...') {
+      this.setState({promptVisible: true, picking: 'Remove Choice'});
     } else {
       this.setState({choice: value, choiceNum: index});
     }
+  }
+
+  pickDate = () => {
+
   }
 
   handleSubmit = () => {
@@ -83,23 +91,20 @@ export default class PaymentChecker extends Component {
     if(!date){
       // Getting today's date
       let today = new Date();
-      let day = today.getDay();
-      switch(day){
-        case 0: day = 'Sun'; break;
-        case 1: day = 'Mon'; break;
-        case 2: day = 'Tue'; break;
-        case 3: day = 'Wed'; break;
-        case 4: day = 'Thu'; break;
-        case 5: day = 'Fri'; break;
-        case 6: day = 'Sat'; break;
-      }
-      // Formatting the date, e.g. 17-9-2017 (Sun)
-      date = today.getDate() + '-' + (today.getMonth() + 1) + '-' + today.getFullYear() + ' [' + day + ']';
+      // Format day to DD
+      let day = today.getDate();
+      day = (day < 10)? '0'+day : day;
+      // Format month to MM
+      let month = today.getMonth() + 1;
+      month = (month < 10)? '0'+month : month;
+      let year = today.getFullYear();
+      // Formatting the date to DD-MM-YYYY
+      date = day + '-' + month + '-' + year;
     }
     // Getting the list sections
     let sections = this.state.sections;
     // Getting the text input, prepending the date, appending the choice
-    let text = [date, '$' + this.state.text, this.state.choice].join(' ');
+    let text = ['[' + date + ']', '$ ' + this.state.text, this.state.choice].join(' ');
     // Pushing the text input as new item
     sections[this.state.cardNum].data.push(text);
     // Setting the new state
@@ -115,11 +120,9 @@ export default class PaymentChecker extends Component {
       <View style={styles.container}>
         <Prompt
           title={this.state.picking}
-          placeholder='New Entry Here'
+          placeholder={(this.state.picking == 'Create New Card' || this.state.picking == 'Create New Choice')? 'New Entry Here' : 'Item Name To Remove'}
           visible={ this.state.promptVisible }
-          onCancel={ () => this.setState({
-            promptVisible: false
-          }) }
+          onCancel={ () => this.setState({ promptVisible: false }) }
           onSubmit={ (value) => {
             if(this.state.picking == 'Create New Card'){
               let sections = this.state.sections;
@@ -129,17 +132,51 @@ export default class PaymentChecker extends Component {
                 cards.push(sections[i].title);
               }
               this.setState({promptVisible: false, sections: sections, cards: cards});
-            } else {
+            } else if(this.state.picking == 'Create New Choice'){
               let choices = this.state.choices;
               choices.push(value);
               this.setState({promptVisible: false, choices: choices});
+            } else if(this.state.picking == 'Remove Card'){
+              let sections = this.state.sections;
+              let index = null;
+              for(let i = 0; i < sections.length; i++){
+                if(value == sections[i].title){
+                  index = i;
+                  break;
+                }
+              }
+              if(index != null){
+                sections.splice(index, 1);
+                let cards = [];
+                for(let i = 0; i < sections.length; i++){
+                  cards.push(sections[i].title);
+                }
+                this.setState({promptVisible: false, sections: sections, cards: cards})
+              } else {
+                this.setState({promptVisible: false});
+              }
+            } else if(this.state.picking == 'Remove Choice'){
+              let choices = this.state.choices;
+              let index = null;
+              for(let i = 0; i < choices.length; i++){
+                if(value == choices[i]){
+                  index = i;
+                  break;
+                }
+              }
+              if(index != null){
+                choices.splice(index, 1);
+                this.setState({promptVisible: false, choices: choices});
+              } else {
+                this.setState({promptVisible: false});
+              }
             }
           } }
         />
         <SectionList
           sections={this.state.sections}
           renderSectionHeader={({section, index}) => <Header title={section.title}/>}
-          renderItem={({item}) => <Entry text={item} key={item}/>}
+          renderItem={({item}) => <Entry text={item}/>}
         />
         <View style={styles.newInput}>
           <Text style={{fontSize: 20, flex: 1}}>$</Text>
@@ -153,6 +190,32 @@ export default class PaymentChecker extends Component {
             style={{flex: 2}}
             onPress={this.handleSubmit}
             title='Submit'
+          />
+        </View>
+        <View style={{alignItems: 'center'}}>
+          <DatePicker
+            style={{width: 200}}
+            date={this.state.date}
+            mode='date'
+            androidMode='spinner'
+            placeholder='Select Date'
+            format='DD-MM-YYYY'
+            minDate='01-09-2000'
+            maxDate='30-09-2030'
+            confirmBtnText='Confirm'
+            cancelBtnText='Cancel'
+            customStyles={{
+              dateIcon: {
+                position: 'absolute',
+                left: 0,
+                top: 4,
+                marginLeft: 0
+              },
+              dateInput: {
+                marginLeft: 36
+              }
+            }}
+            onDateChange={(date) => {this.setState({date: date})}}
           />
         </View>
         <View style={{flexDirection: 'row', alignItems: 'center'}}>
@@ -214,8 +277,9 @@ class CardPicker extends React.Component {
         selectedValue={this.state.card}
         onValueChange={this.props.onValueChange}
       >
-        {this.state.cards.map((card) => {return <Picker.Item label={card} value={card}/>})}
+        {this.state.cards.map((card) => {return <Picker.Item label={card} value={card} key={card}/>})}
         <Picker.Item label='Add New Card...' value='Add New Card...'/>
+        <Picker.Item label='Remove Card...' value='Remove Card...'/>
       </Picker>
     )
   }
@@ -240,8 +304,9 @@ class ItemPicker extends React.Component {
         selectedValue={this.state.choice}
         onValueChange={this.props.onValueChange}
       >
-        {this.state.choices.map((item) => {return <Picker.Item label={item} value={item}/>})}
+        {this.state.choices.map((item) => {return <Picker.Item label={item} value={item} key={item}/>})}
         <Picker.Item label='Add New Choice...' value='Add New Choice...'/>
+        <Picker.Item label='Remove Choice...' value='Remove Choice...'/>
       </Picker>
     )
   }

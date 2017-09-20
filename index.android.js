@@ -13,7 +13,8 @@ import {
   TextInput,
   SectionList,
   Button,
-  Picker
+  Picker,
+  AsyncStorage
 } from 'react-native';
 import Prompt from 'react-native-prompt';
 import DatePicker from 'react-native-datepicker';
@@ -22,21 +23,12 @@ export default class PaymentChecker extends Component {
   constructor(props) {
     super(props);
     this.state = {
-      sections: [
-        {
-          title: 'First Card',
-          data: ['PAD']
-        },
-        {
-          title: 'Second Card',
-          data: ['Clash Royale', 'PPS']
-        }
-      ],
+      sections: [],
       text: '',
       cards: [],
       card: null,
       cardNum: 0,
-      choices: ['Puzzle and Dragons', 'Clash Royale', 'Apple'],
+      choices: [],
       choice: null,
       choiceNum: 0,
       date: null,
@@ -45,43 +37,171 @@ export default class PaymentChecker extends Component {
     }
   }
 
-  componentDidMount() {
-    let sections = this.state.sections;
-    let cards = [];
-    for(let i = 0; i < sections.length; i++){
-      cards.push(sections[i].title);
-    }
-    this.setState({
-      cards: cards,
-      card: this.state.sections[0].title,
-      choice: this.state.choices[1]
+  // Fetching Data from AsyncStorage
+  componentWillMount() {
+    AsyncStorage.getItem("sections").then((value) => {
+      if(value){
+        let sections = JSON.parse(value);
+        let sections_formatted = [];
+        let cards = [];
+        for(let i = 0; i < sections.length; i++){
+          let sectionObject = {
+            title: sections[i].title,
+            data: []
+          };
+          cards.push(sections[i].title);
+          for(let j = 0; j < sections[i].data.length; j++){
+            sectionObject.data.push(sections[i].data[j]);
+          }
+          sections_formatted.push(sectionObject);
+        }
+        card = (cards.length == 0)? '' : cards[0];
+        // Force Creating New Card if none exists
+        let promptVisible = this.state.promptVisible;
+        if(cards.length == 0){
+          promptVisible = true;
+        }
+        let choices = (this.state.choices.length == 0)? [] : this.state.choices;
+        let choice = (choices.length == 0)? '' : choices[0];
+        this.setState({promptVisible: promptVisible, cards: cards, card: card, choices: choices, choice: choice, sections: sections_formatted});
+      } else {
+        this.setState({promptVisible: true, sections: [], cards: [], card: '', picking: 'Create New Card'});
+      }
+    }).done(() => {
+      if(this.state.cards.length == 0 && !this.state.promptVisible){
+        this.setState({promptVisible: true, picking: 'Create New Card'});
+      }
     });
+    AsyncStorage.getItem("choices").then((value) => {
+      value = JSON.parse(value);
+      let choices = (value)? value : [];
+      let choice = (choices[0])? choices[0] : '';
+      this.setState({choices: choices, choice: choice});
+    }).done(() => {
+      if(this.state.choices.length == 0 && !this.state.promptVisible){
+        this.setState({promptVisible: true, picking: 'Create New Choice'});
+      }
+    });
+  }
+
+  saveItems = (sections) => {
+    AsyncStorage.setItem("sections", JSON.stringify(sections));
+  }
+
+  saveChoices = (choices) => {
+    AsyncStorage.setItem("choices", JSON.stringify(choices));
   }
 
   pickCard = (value, index) => {
     // Check if creating new card / removing a card
     if(value == 'Add New Card...'){
-      this.setState({promptVisible: true, picking: 'Create New Card'});
+      this.setState({promptVisible: true, picking: 'Create New Card', card: value, cardNum: index});
+      this.forceUpdate();
     } else if(value == 'Remove Card...'){
-      this.setState({promptVisible: true, picking: 'Remove Card'});
+      this.setState({promptVisible: true, picking: 'Remove Card', card: value, cardNum: index});
+      this.forceUpdate();
     } else {
       this.setState({card: value, cardNum: index});
+      this.forceUpdate();
     }
   }
 
   pickChoice = (value, index) => {
     // Check if creatng new choices / removing a choice
     if(value == 'Add New Choice...'){
-      this.setState({promptVisible: true, picking: 'Create New Choice'});
+      this.setState({promptVisible: true, picking: 'Create New Choice', choice: value, choiceNum: index});
+      this.forceUpdate();
     } else if(value == 'Remove Choice...') {
-      this.setState({promptVisible: true, picking: 'Remove Choice'});
+      this.setState({promptVisible: true, picking: 'Remove Choice', choice: value, choiceNum: index});
+      this.forceUpdate();
     } else {
       this.setState({choice: value, choiceNum: index});
+      this.forceUpdate();
     }
   }
 
-  pickDate = () => {
+  submitPrompt = (value) => {
+    if(this.state.picking == 'Create New Card'){
+      let sections = this.state.sections;
+      sections.push({title: value, data:[]});
+      let cards = [];
+      for(let i = 0; i < sections.length; i++){
+        cards.push(sections[i].title);
+      }
+      this.saveItems(sections);
+      if(this.state.choices.length == 0){
+        this.setState({promptVisible: true, picking: 'Create New Choice', sections: sections, cards: cards, card: cards[0], cardNum: 0});
+      } else {
+        this.setState({promptVisible: false, sections: sections, cards: cards, card: cards[0], cardNum: 0});
+      }      
+    } else if(this.state.picking == 'Create New Choice'){
+      let choices = this.state.choices;
+      choices.push(value);
+      this.saveChoices(choices);
+      this.setState({promptVisible: false, choices: choices, choice: choices[0], choiceNum: 0});
+    } else if(this.state.picking == 'Remove Card'){
+      let sections = this.state.sections;
+      let index = null;
+      for(let i = 0; i < sections.length; i++){
+        if(value == sections[i].title){
+          index = i;
+          break;
+        }
+      }
+      if(index != null){
+        sections.splice(index, 1);
+        let cards = [];
+        for(let i = 0; i < sections.length; i++){
+          cards.push(sections[i].title);
+        }
+        let card = (cards.length == 0)? '' : cards[0];
+        this.saveItems(sections);
+        this.setState({promptVisible: false, sections: sections, cards: cards, card: card, cardNum: 0})
+      } else {
+        let card = (this.state.cards.length == 0)? '' : this.state.cards[0];
+        this.saveItems(sections);
+        this.setState({promptVisible: false, card: card, cardNum: 0});
+      }
+    } else if(this.state.picking == 'Remove Choice'){
+      let choices = this.state.choices;
+      let index = null;
+      for(let i = 0; i < choices.length; i++){
+        if(value == choices[i]){
+          index = i;
+          break;
+        }
+      }
+      if(index != null){
+        choices.splice(index, 1);
+        let choice = (choices.length == 0)? '' : choices[0];
+        this.saveChoices(choices);
+        if(choices.length == 0){
+          this.setState({promptVisible: true, picking: 'Create New Choice', choices: choices, choice: choice, choiceNum: 0});
+        } else {
+          this.setState({promptVisible: false, choices: choices, choice: choice, choiceNum: 0});
+        }
+      } else {
+        let choice = (this.state.choices.length == 0)? '' : this.state.choices[0];
+        this.saveChoices(choices);
+        if(choices.length == 0){
+          this.setState({promptVisible: true, picking: 'Create New Choice', choice: choice, choiceNum: 0});
+        } else {
+          this.setState({promptVisible: false, choice: choice, choiceNum: 0});
+        }
+      }
+    }
+  }
 
+  cancelPrompt = () => {
+    if(this.state.picking == 'Create New Card'|| this.state.picking == 'Remove Card'){
+      if(this.state.cards.length != 0){
+        this.setState({promptVisible: false, card: this.state.cards[0], cardNum: 0});
+      }
+    } else if(this.state.picking == 'Create New Choice' || this.state.picking == 'Remove Choice'){
+      if(this.state.choices.length != 0){
+        this.setState({promptVisible: false, choice: this.state.choices[0], choiceNum: 0});
+      }
+    }
   }
 
   handleSubmit = () => {
@@ -112,71 +232,23 @@ export default class PaymentChecker extends Component {
       sections: sections,
       text: ''
     }
+    this.saveItems(sections);
     this.setState(() => nextState);
   }
 
   render() {
     return (
       <View style={styles.container}>
-        <Prompt
-          title={this.state.picking}
-          placeholder={(this.state.picking == 'Create New Card' || this.state.picking == 'Create New Choice')? 'New Entry Here' : 'Item Name To Remove'}
-          visible={ this.state.promptVisible }
-          onCancel={ () => this.setState({ promptVisible: false }) }
-          onSubmit={ (value) => {
-            if(this.state.picking == 'Create New Card'){
-              let sections = this.state.sections;
-              sections.push({title: value, data:[]});
-              let cards = [];
-              for(let i = 0; i < sections.length; i++){
-                cards.push(sections[i].title);
-              }
-              this.setState({promptVisible: false, sections: sections, cards: cards});
-            } else if(this.state.picking == 'Create New Choice'){
-              let choices = this.state.choices;
-              choices.push(value);
-              this.setState({promptVisible: false, choices: choices});
-            } else if(this.state.picking == 'Remove Card'){
-              let sections = this.state.sections;
-              let index = null;
-              for(let i = 0; i < sections.length; i++){
-                if(value == sections[i].title){
-                  index = i;
-                  break;
-                }
-              }
-              if(index != null){
-                sections.splice(index, 1);
-                let cards = [];
-                for(let i = 0; i < sections.length; i++){
-                  cards.push(sections[i].title);
-                }
-                this.setState({promptVisible: false, sections: sections, cards: cards})
-              } else {
-                this.setState({promptVisible: false});
-              }
-            } else if(this.state.picking == 'Remove Choice'){
-              let choices = this.state.choices;
-              let index = null;
-              for(let i = 0; i < choices.length; i++){
-                if(value == choices[i]){
-                  index = i;
-                  break;
-                }
-              }
-              if(index != null){
-                choices.splice(index, 1);
-                this.setState({promptVisible: false, choices: choices});
-              } else {
-                this.setState({promptVisible: false});
-              }
-            }
-          } }
+        <PopUpPrompt
+          picking={this.state.picking}
+          promptVisible={ this.state.promptVisible }
+          cancelPrompt={this.cancelPrompt}
+          submitPrompt={this.submitPrompt}
         />
         <SectionList
           sections={this.state.sections}
           renderSectionHeader={({section, index}) => <Header title={section.title}/>}
-          renderItem={({item}) => <Entry text={item}/>}
+          renderItem={({item}) => <Entries text={item}/>}
         />
         <View style={styles.newInput}>
           <Text style={{fontSize: 20, flex: 1}}>$</Text>
@@ -242,10 +314,10 @@ export default class PaymentChecker extends Component {
 }
 
 // The displayed entries component
-class Entry extends React.Component {
+class Entries extends React.Component {
   render() {
     return (
-      <Text style={styles.entry}>{this.props.text}</Text>
+      <Text style={styles.entries}>{this.props.text}</Text>
     )
   }
 }
@@ -274,7 +346,7 @@ class CardPicker extends React.Component {
   render() {
     return (
       <Picker
-        selectedValue={this.state.card}
+        selectedValue={this.state.card? this.state.card : ''}
         onValueChange={this.props.onValueChange}
       >
         {this.state.cards.map((card) => {return <Picker.Item label={card} value={card} key={card}/>})}
@@ -300,8 +372,7 @@ class ItemPicker extends React.Component {
   render() {
     return(
       <Picker
-        style={{alignItems: 'center'}}
-        selectedValue={this.state.choice}
+        selectedValue={this.state.choice? this.state.choice : ''}
         onValueChange={this.props.onValueChange}
       >
         {this.state.choices.map((item) => {return <Picker.Item label={item} value={item} key={item}/>})}
@@ -312,13 +383,36 @@ class ItemPicker extends React.Component {
   }
 }
 
+class PopUpPrompt extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = {...this.props}
+  }
+
+  componentWillReceiveProps(nextProps) {
+    this.setState({...nextProps});
+  }
+
+  render() {
+    return(
+      <Prompt
+          title={this.state.picking}
+          placeholder={(this.state.picking == 'Create New Card' || this.state.picking == 'Create New Choice')? 'New Entry Here' : 'Item Name To Remove'}
+          visible={this.state.promptVisible}
+          onCancel={this.props.cancelPrompt}
+          onSubmit={this.props.submitPrompt}
+        />
+    )
+  }
+}
+
 const styles = StyleSheet.create({
   // Outermost container
   container: {
     flex: 1,
   },
   // Entries
-  entry: {
+  entries: {
     padding: 10,
     fontSize: 18,
     height: 44,

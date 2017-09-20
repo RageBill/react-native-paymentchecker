@@ -14,7 +14,9 @@ import {
   SectionList,
   Button,
   Picker,
-  AsyncStorage
+  AsyncStorage,
+  TouchableHighlight,
+  Alert
 } from 'react-native';
 import Prompt from 'react-native-prompt';
 import DatePicker from 'react-native-datepicker';
@@ -39,7 +41,7 @@ export default class PaymentChecker extends Component {
 
   // Fetching Data from AsyncStorage
   componentWillMount() {
-    AsyncStorage.getItem("sections").then((value) => {
+    AsyncStorage.getItem('sections').then((value) => {
       if(value){
         let sections = JSON.parse(value);
         let sections_formatted = [];
@@ -72,7 +74,7 @@ export default class PaymentChecker extends Component {
         this.setState({promptVisible: true, picking: 'Create New Card'});
       }
     });
-    AsyncStorage.getItem("choices").then((value) => {
+    AsyncStorage.getItem('choices').then((value) => {
       value = JSON.parse(value);
       let choices = (value)? value : [];
       let choice = (choices[0])? choices[0] : '';
@@ -85,11 +87,37 @@ export default class PaymentChecker extends Component {
   }
 
   saveItems = (sections) => {
-    AsyncStorage.setItem("sections", JSON.stringify(sections));
+    AsyncStorage.setItem('sections', JSON.stringify(sections));
   }
 
   saveChoices = (choices) => {
-    AsyncStorage.setItem("choices", JSON.stringify(choices));
+    AsyncStorage.setItem('choices', JSON.stringify(choices));
+  }
+
+  confirmedRemoveEntry = (name) => {
+    let sections = this.state.sections;
+    let entry = name.split('-');
+    let title = entry[0];
+    let index = entry[1];
+    for(let i = 0; i < sections.length; i++){
+      if(sections[i].title == title){
+        sections[i].data.splice(index,1);
+        break;
+      }
+    }
+    this.saveItems(sections);
+    this.setState({sections: sections});
+  }
+
+  removeEntry = (name) => {
+    Alert.alert(
+      'Delete Entry',
+      'Remove this entry?',
+      [
+      {text: 'Confirm', onPress: () => this.confirmedRemoveEntry(name)},
+      {text: 'Cancel', style: 'cancel'}
+    ],
+    {cancelable: true});
   }
 
   pickCard = (value, index) => {
@@ -247,8 +275,8 @@ export default class PaymentChecker extends Component {
         />
         <SectionList
           sections={this.state.sections}
-          renderSectionHeader={({section, index}) => <Header title={section.title}/>}
-          renderItem={({item}) => <Entries text={item}/>}
+          renderSectionHeader={({section, index}) => <Header title={section.title} key={index}/>}
+          renderItem={({item, index, section}) => <Entries text={item} removeEntry={this.removeEntry} name={section.title + '-' + index}/>}
         />
         <View style={styles.newInput}>
           <Text style={{fontSize: 20, flex: 1}}>$</Text>
@@ -317,7 +345,11 @@ export default class PaymentChecker extends Component {
 class Entries extends React.Component {
   render() {
     return (
-      <Text style={styles.entries}>{this.props.text}</Text>
+      <TouchableHighlight onLongPress={() => this.props.removeEntry(this.props.name)} underlayColor='white'>
+        <View>
+          <Text style={styles.entries}>{this.props.text}</Text>
+        </View>
+      </TouchableHighlight>
     )
   }
 }

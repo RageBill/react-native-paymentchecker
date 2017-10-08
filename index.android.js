@@ -1,9 +1,3 @@
-/**
- * Sample React Native App
- * https://github.com/facebook/react-native
- * @flow
- */
-
 import React, { Component } from 'react';
 import {
   AppRegistry,
@@ -86,14 +80,17 @@ export default class PaymentChecker extends Component {
     });
   }
 
+  // Saving sections (all entries) to AsyncStorage
   saveItems = (sections) => {
     AsyncStorage.setItem('sections', JSON.stringify(sections));
   }
 
+  // Saving choices (entry's usage) to AsyncStorage
   saveChoices = (choices) => {
     AsyncStorage.setItem('choices', JSON.stringify(choices));
   }
 
+  // Removing entry from the section list
   confirmedRemoveEntry = (name) => {
     let sections = this.state.sections;
     let entry = name.split('-');
@@ -109,6 +106,7 @@ export default class PaymentChecker extends Component {
     this.setState({sections: sections});
   }
 
+  // Prompt to ask if removing an entry from the section list
   removeEntry = (name) => {
     Alert.alert(
       'Delete Entry',
@@ -120,6 +118,7 @@ export default class PaymentChecker extends Component {
     {cancelable: true});
   }
 
+  // For determining choice of the card picker
   pickCard = (value, index) => {
     // Check if creating new card / removing a card
     if(value == 'Add New Card...'){
@@ -134,6 +133,7 @@ export default class PaymentChecker extends Component {
     }
   }
 
+  // For determining choice of the entry's usage picker
   pickChoice = (value, index) => {
     // Check if creatng new choices / removing a choice
     if(value == 'Add New Choice...'){
@@ -148,6 +148,7 @@ export default class PaymentChecker extends Component {
     }
   }
 
+  // Determining what happens what the PopUpPrompt is being submitted
   submitPrompt = (value) => {
     if(this.state.picking == 'Create New Card'){
       let sections = this.state.sections;
@@ -220,6 +221,7 @@ export default class PaymentChecker extends Component {
     }
   }
 
+  // Determining what happens when the PopUpPrompt is cancelled
   cancelPrompt = () => {
     if(this.state.picking == 'Create New Card'|| this.state.picking == 'Remove Card'){
       if(this.state.cards.length != 0){
@@ -232,6 +234,7 @@ export default class PaymentChecker extends Component {
     }
   }
 
+  // When submit button is clicked
   handleSubmit = () => {
     // Getting the date
     let date = this.state.date;
@@ -267,18 +270,22 @@ export default class PaymentChecker extends Component {
   render() {
     return (
       <View style={styles.container}>
+        {/* Popup for inputs - All choices use the same popupprompt! */}
         <PopUpPrompt
           picking={this.state.picking}
           promptVisible={ this.state.promptVisible }
           cancelPrompt={this.cancelPrompt}
           submitPrompt={this.submitPrompt}
         />
+        {/* Section list for displaying all the results */}
         <SectionList
           sections={this.state.sections}
           renderSectionHeader={({section, index}) => <Header title={section.title} key={index}/>}
           renderItem={({item, index, section}) => <Entries text={item} removeEntry={this.removeEntry} name={section.title + '-' + index}/>}
         />
+        {/* Input for new entries */}
         <View style={styles.newInput}>
+          {/* Input field & the dollar sign in front */}
           <Text style={{fontSize: 20, flex: 1}}>$</Text>
           <TextInput
             style={{fontSize: 18, flex: 10}}
@@ -286,6 +293,7 @@ export default class PaymentChecker extends Component {
             value={this.state.text}
             onChangeText={(text) => this.setState({text})}
           />
+          {/* Submit Button of input field */}
           <Button
             style={{flex: 2}}
             onPress={this.handleSubmit}
@@ -293,6 +301,7 @@ export default class PaymentChecker extends Component {
           />
         </View>
         <View style={{alignItems: 'center'}}>
+          {/* Date picker to choose entry date */}
           <DatePicker
             style={{width: 200}}
             date={this.state.date}
@@ -318,6 +327,7 @@ export default class PaymentChecker extends Component {
             onDateChange={(date) => {this.setState({date: date})}}
           />
         </View>
+        {/* Bottom container for picking card and the entry's uses */}
         <View style={{flexDirection: 'row', alignItems: 'center'}}>
           <View style={{flex: 1}}>
             <CardPicker
@@ -396,7 +406,7 @@ class ItemPicker extends React.Component {
     this.state = {...props}
   }
 
-  // Update the picker after picker
+  // Update the picker after pickin
   componentWillReceiveProps(nextProps) {
     this.setState({...nextProps});
   }
